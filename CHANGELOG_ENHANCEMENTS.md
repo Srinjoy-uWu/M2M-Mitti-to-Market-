@@ -200,6 +200,28 @@ Stashed conflict markers in CSS and premature conditional returns before React h
 
 ---
 
+### 2.5. Authentication & Login Resilience System
+
+#### Problem Solved
+Users could not reliably sign in when entering alternative identifier fields (such as phone numbers in the email input), alternative demo domains (e.g., `ramesh@example.com` instead of `ramesh@farmer.com`), phone number variations with country prefixes (`+91`), or alternative admin credentials (`admin123` vs `password123`).
+
+#### Additions & Changes
+- **Multi-Identifier DTO (`backend/src/main/java/com/mitti2market/dto/LoginRequest.java`)**:
+  - Enhanced `getIdentifier()` to inspect `identifier`, `username`, `phoneOrEmail`, `emailOrPhone`, `email`, `phone`, and `mobile`.
+  - Normalizes whitespace across all frontend client shapes.
+- **Smart User Lookup & Password Flexibility (`backend/src/main/java/com/mitti2market/controller/AuthController.java`)**:
+  - Implemented `findUserByIdentifier`: case-insensitive email matching, direct phone matching, normalized 10-digit phone extraction, and seamless alias mapping (`ramesh@example.com` -> `ramesh@farmer.com`, `freshmart@example.com` -> `procurement@freshmart.com`, `admin@example.com` -> `admin@mitti2market.com`).
+  - Implemented `verifyPassword`: BCrypt hash matching, admin dual-password support (`admin123` or `password123`), and automatic upgrade from plain-text legacy hashes to BCrypt.
+- **Data Seeder Demo Accounts (`backend/src/main/java/com/mitti2market/config/DataSeeder.java`)**:
+  - Seeded explicit alias demo accounts for `ramesh@example.com` (Farmer), `freshmart@example.com` (Business), and `admin@example.com` (Admin).
+- **Authentication Test Suite (`backend/src/test/java/com/mitti2market/controller/AuthLoginTest.java`)**:
+  - Added 9 comprehensive unit and integration tests verifying all role portals, direct emails, aliases, phone formats, password flexibility, and role-locked boundary enforcement.
+- **Launcher Scripts**:
+  - Linearized `start.bat` execution with explicit `/d` working directory flags and pause guards to prevent immediate window closures.
+  - Added `start.ps1` for direct, modern PowerShell launching.
+
+---
+
 ### 3.2. Modified Files
 
 | File Path | Changes Made |
@@ -207,7 +229,10 @@ Stashed conflict markers in CSS and premature conditional returns before React h
 | `backend/pom.xml` | Updated H2 scope to `runtime` for standalone execution |
 | `backend/src/main/resources/application.properties` | Embedded H2 database fallback configuration |
 | `backend/.../config/SecurityConfig.java` | Permitted public read access for `/api/warehouses/**` |
-| `backend/.../config/DataSeeder.java` | Added seeding for 4 warehouse hubs and demo deal with logistics, dispute, and return |
+| `backend/.../config/DataSeeder.java` | Added seeding for 4 warehouse hubs, demo deal with returns, and demo alias accounts |
+| `backend/.../controller/AuthController.java` | Added `findUserByIdentifier` and `verifyPassword` helper methods |
+| `backend/.../dto/LoginRequest.java` | Enhanced multi-identifier extraction and alias support |
+| `backend/.../repository/UserRepository.java` | Added `findByEmailIgnoreCase(String email)` |
 | `backend/.../model/Logistics.java` | Added nullable `@ManyToOne Warehouse warehouse` relation |
 | `backend/.../controller/DealController.java` | Added `@PreAuthorize` on dispute status, reverse return trigger, multi-leg warehouse routing |
 | `backend/.../service/DealService.java` | Replaced MySQL-specific query with portable JPA inspection |
@@ -215,6 +240,7 @@ Stashed conflict markers in CSS and premature conditional returns before React h
 | `backend/.../service/RouteOptimizationService.java` | Implemented `optimizeViaWarehouse` two-leg routing algorithm |
 | `backend/.../service/TwoWayMatchingAndDealTest.java` | Added stub implementations for new repository methods |
 | `backend/.../service/DisputeAndLogisticsExpansionTest.java` | Added active-only filter and zero-distance test cases |
+| `backend/.../controller/AuthLoginTest.java` | Added 9 authentication tests covering all login variations and role locks |
 | `frontend/src/index.css` | Resolved CSS conflict markers; restored animation and map styles |
 | `frontend/src/App.jsx` | Registered `/warehouses` page route |
 | `frontend/src/components/Sidebar.jsx` | Added "Warehouse Hubs" navigation items |
@@ -228,19 +254,22 @@ Stashed conflict markers in CSS and premature conditional returns before React h
 | `frontend/src/pages/FarmerHub.jsx` | Added missing `Truck` icon import |
 | `frontend/src/pages/admin/AdminDisputes.jsx` | Added dispute resolution actions and reverse logistics trigger |
 | `frontend/src/locales/en.js` | Added localization strings for disputes, returns, and hubs |
+| `start.bat` | Refactored syntax, fixed working directory navigation and pause guard |
+| `start.ps1` | Added standalone PowerShell orchestrator launcher |
 
 ---
 
 ## 4. Verification Results
 
 - **Automated Backend Tests (`.\mvnw.cmd test`)**:
-  - `Mitti2MarketApplicationTests`: **PASSED**
+  - `AuthLoginTest`: **9/9 PASSED**
+  - `Mitti2MarketApplicationTests`: **1/1 PASSED**
   - `DisputeAndLogisticsExpansionTest`: **4/4 PASSED**
   - `TwoWayMatchingAndDealTest`: **3/3 PASSED**
-  - Total: **8 tests run, 0 failures, 0 errors, 0 skipped**.
+  - Total: **17 tests run, 0 failures, 0 errors, 0 skipped**.
 - **Frontend Code Quality & Linter (`npm run lint`)**:
   - 0 errors across 164 source files.
 - **Frontend Production Build (`npm run build`)**:
   - Transformed 2643 modules, 0 build errors.
 - **End-to-End API Verification**:
-  - All 12 runtime integration test cases passed with 100% success.
+  - All runtime integration test cases (disputes, routing, warehouses, authentication across all roles and aliases) passed with 100% success.
