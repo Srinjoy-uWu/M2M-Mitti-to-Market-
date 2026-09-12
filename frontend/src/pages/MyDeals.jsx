@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
-import { Package, Truck, Clock, Check, ChevronRight, Filter, Star } from 'lucide-react';
+import { Package, Truck, Clock, Check, ChevronRight, Filter, Star, AlertCircle } from 'lucide-react';
 import { getFarmerDeals, getBuyerDeals } from '../api/dealApi';
 import DealRatingModal from '../components/DealRatingModal';
 
@@ -127,6 +127,13 @@ export default function MyDeals() {
                     </div>
                     <p className="text-sm font-bold text-navy-900">₹{Number(deal.totalAmount).toLocaleString()}</p>
                   </div>
+
+                  {deal.status === 'DISPUTED' && (
+                    <div className="mb-3 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Active dispute under review — settlement on hold</span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-3">
                     <div>

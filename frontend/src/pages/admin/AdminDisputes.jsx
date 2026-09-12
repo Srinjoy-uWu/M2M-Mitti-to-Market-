@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getDisputes } from '../../services/adminApi';
+import { updateDisputeStatus } from '../../api/disputeApi';
 import {
   Table, Td, TableSkeleton, EmptyState, ErrorState, StatusDot, genericStatusInfo, selectCls,
 } from '../../components/admin/ui/adminUi';
@@ -12,6 +13,7 @@ export default function AdminDisputes() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('ALL');
   const [expanded, setExpanded] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const fetchDisputes = useCallback(async () => {
     setLoading(true);
@@ -21,6 +23,18 @@ export default function AdminDisputes() {
     else setError(res.error);
     setLoading(false);
   }, [status]);
+
+  const handleStatusChange = async (disputeId, newStatus, initiateReturn = false) => {
+    setActionBusy(true);
+    try {
+      await updateDisputeStatus(disputeId, { status: newStatus, initiateReturn });
+      await fetchDisputes();
+    } catch (err) {
+      alert(err?.message || 'Failed to update dispute');
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   useEffect(() => { fetchDisputes(); }, [fetchDisputes]);
 
@@ -84,9 +98,50 @@ export default function AdminDisputes() {
                   {isOpen && (
                     <tr key={`${d.id}-detail`}>
                       <td colSpan={7} className="px-4 pb-4">
-                        <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Dispute description</p>
-                          <p className="text-[13px] text-gray-700 whitespace-pre-wrap">{d.description || 'No description provided.'}</p>
+                        <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 space-y-3">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Dispute description</p>
+                            <p className="text-[13px] text-gray-700 whitespace-pre-wrap">{d.description || 'No description provided.'}</p>
+                          </div>
+                          {d.status !== 'RESOLVED' && d.status !== 'REJECTED' && (
+                            <div className="flex items-center gap-2 pt-2 border-t border-gray-200/60 flex-wrap">
+                              <span className="text-xs font-semibold text-gray-500">Moderation actions:</span>
+                              {d.status === 'OPEN' && (
+                                <button
+                                  type="button"
+                                  disabled={actionBusy}
+                                  onClick={() => handleStatusChange(d.id, 'UNDER_REVIEW')}
+                                  className="px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition"
+                                >
+                                  Mark Under Review
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={actionBusy}
+                                onClick={() => handleStatusChange(d.id, 'RESOLVED', false)}
+                                className="px-2.5 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition"
+                              >
+                                Resolve Dispute
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionBusy}
+                                onClick={() => handleStatusChange(d.id, 'RESOLVED', true)}
+                                className="px-2.5 py-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition"
+                              >
+                                Resolve & Initiate Return
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actionBusy}
+                                onClick={() => handleStatusChange(d.id, 'REJECTED')}
+                                className="px-2.5 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition"
+                              >
+                                Reject Dispute
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>

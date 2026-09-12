@@ -12,7 +12,9 @@ import com.mitti2market.repository.DisputeRepository;
 import com.mitti2market.service.DealService;
 import com.mitti2market.service.DealStateMachineService;
 import com.mitti2market.service.LogisticsService;
+import com.mitti2market.service.ReturnLogisticsService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -28,15 +30,17 @@ public class DealController {
     private final DealStateMachineService stateMachine;
     private final DisputeRepository disputeRepo;
     private final TokenService tokens;
+    private final ReturnLogisticsService returnLogisticsService;
 
     public DealController(DealService dealService, LogisticsService logisticsService,
                           DealStateMachineService stateMachine, DisputeRepository disputeRepo,
-                          TokenService tokens) {
+                          TokenService tokens, ReturnLogisticsService returnLogisticsService) {
         this.dealService = dealService;
         this.logisticsService = logisticsService;
         this.stateMachine = stateMachine;
         this.disputeRepo = disputeRepo;
         this.tokens = tokens;
+        this.returnLogisticsService = returnLogisticsService;
     }
 
     /** Initiate deal lock from chat */
@@ -293,20 +297,59 @@ public class DealController {
         try {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> stops = (List<Map<String, Object>>) body.get("stops");
-            @SuppressWarnings("unchecked")
-            List<Double> originList = (List<Double>) body.get("origin");
+            List<?> originList = (List<?>) body.get("origin");
             Double capacity = body.get("capacityKg") != null
-                    ? Double.valueOf(body.get("capacityKg").toString()) : null;
+                    ? toDouble(body.get("capacityKg")) : null;
 
             if (stops == null || originList == null || originList.size() < 2) {
                 throw new com.mitti2market.exception.BadRequestException("origin [lat,lng] and stops are required");
             }
             var result = logisticsService.optimizeRoute(
-                    new double[]{originList.get(0), originList.get(1)}, stops, capacity);
+                    new double[]{toDouble(originList.get(0)), toDouble(originList.get(1))}, stops, capacity);
             return ResponseEntity.ok(ApiResponse.ok("Route optimized", result));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    /** Multi-leg route optimization through a consolidation warehouse hub */
+    @PostMapping("/logistics/optimize-route-via-warehouse")
+    public ResponseEntity<?> optimizeRouteViaWarehouse(
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @RequestBody Map<String, Object> body) {
+        Long userId = extractUserId(authHeader);
+        if (userId == null) return ResponseEntity.status(401).body(ApiResponse.error("Not authenticated"));
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> farmerPickups = (List<Map<String, Object>>) body.get("farmerPickups");
+            List<?> warehouseList = (List<?>) body.get("warehouseCoords");
+            List<?> buyerList = (List<?>) body.get("buyerCoords");
+            Double capacity = body.get("capacityKg") != null
+                    ? toDouble(body.get("capacityKg")) : null;
+
+            if (farmerPickups == null || warehouseList == null || buyerList == null ||
+                    warehouseList.size() < 2 || buyerList.size() < 2) {
+                throw new com.mitti2market.exception.BadRequestException("farmerPickups, warehouseCoords [lat,lng], and buyerCoords [lat,lng] are required");
+            }
+
+            var result = logisticsService.optimizeRouteViaWarehouse(
+                    farmerPickups,
+                    new double[]{toDouble(warehouseList.get(0)), toDouble(warehouseList.get(1))},
+                    new double[]{toDouble(buyerList.get(0)), toDouble(buyerList.get(1))},
+                    capacity);
+            return ResponseEntity.ok(ApiResponse.ok("Consolidated warehouse route optimized", result));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    private static double toDouble(Object o) {
+        if (o instanceof Number n) return n.doubleValue();
+        if (o != null) {
+            try { return Double.parseDouble(o.toString()); } catch (NumberFormatException ignored) {}
+        }
+        return 0.0;
     }
 
     /** All logistics records involving the authenticated user (farmer or buyer). */
@@ -402,11 +445,12 @@ public class DealController {
     }
 
     /** Update dispute status (admin/review workflow) */
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/disputes/{disputeId}/status")
     public ResponseEntity<?> updateDisputeStatus(
             @RequestHeader(value = "Authorization", required = false) String authHeader,
             @PathVariable Long disputeId,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, Object> body) {
         Long userId = extractUserId(authHeader);
         if (userId == null) return ResponseEntity.status(401).body(ApiResponse.error("Not authenticated"));
 
@@ -419,6 +463,17 @@ public class DealController {
                 dispute.setResolvedAt(java.time.LocalDateTime.now());
             }
             dispute = disputeRepo.save(dispute);
+
+            // Optional reverse logistics trigger
+            boolean initiateReturn = Boolean.parseBoolean(String.valueOf(body.get("initiateReturn")));
+            if (initiateReturn && status == Dispute.DisputeStatus.RESOLVED) {
+                try {
+                    returnLogisticsService.createReturnFromDispute(disputeId);
+                } catch (Exception ex) {
+                    // Return creation failure should not rollback dispute resolution
+                }
+            }
+
             return ResponseEntity.ok(ApiResponse.ok("Dispute status updated", disputeToMap(dispute)));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));

@@ -80,6 +80,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/deals/*/ratings").permitAll()
                 // Public user profile (farmer/buyer detail pages)
                 .requestMatchers(HttpMethod.GET, "/api/users/*/profile-public").permitAll()
+                // Warehouses and regional consolidation hubs
+                .requestMatchers(HttpMethod.GET, "/api/warehouses/**").permitAll()
 
 
                 // ─── Admin endpoints (require ADMIN role) ───

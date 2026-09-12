@@ -47,8 +47,8 @@ public class RouteOptimizationService {
             for (int j = 0; j < n; j++) {
                 if (i == j) { dist[i][j] = 0; continue; }
                 dist[i][j] = RouteService.haversineKm(
-                        (Double) stops.get(i).get("lat"), (Double) stops.get(i).get("lng"),
-                        (Double) stops.get(j).get("lat"), (Double) stops.get(j).get("lng"));
+                        asDouble(stops.get(i).get("lat")), asDouble(stops.get(i).get("lng")),
+                        asDouble(stops.get(j).get("lat")), asDouble(stops.get(j).get("lng")));
             }
         }
 
@@ -68,7 +68,7 @@ public class RouteOptimizationService {
                 if (usedKg + weight > capacity) continue; // capacity-aware
                 double d = current == -1
                         ? RouteService.haversineKm(cursor[0], cursor[1],
-                                (Double) stops.get(j).get("lat"), (Double) stops.get(j).get("lng"))
+                                asDouble(stops.get(j).get("lat")), asDouble(stops.get(j).get("lng")))
                         : dist[current][j];
                 if (d < bestDist) { bestDist = d; bestIdx = j; }
             }
@@ -87,7 +87,7 @@ public class RouteOptimizationService {
         List<double[]> waypoints = new ArrayList<>();
         waypoints.add(origin.get(0));
         for (Map<String, Object> s : ordered) {
-            waypoints.add(new double[]{(Double) s.get("lat"), (Double) s.get("lng")});
+            waypoints.add(new double[]{asDouble(s.get("lat")), asDouble(s.get("lng"))});
         }
 
         RouteEstimate estimate = routeService.estimateRoute(waypoints);
@@ -228,9 +228,72 @@ public class RouteOptimizationService {
                 .build();
     }
 
+    /**
+     * Multi-leg consolidation route optimization via a warehouse / aggregation hub.
+     * Leg 1: Farmer pickups consolidated into the warehouse hub.
+     * Leg 2: Direct bulk delivery from the warehouse hub to the buyer destination.
+     */
+    public Map<String, Object> optimizeViaWarehouse(
+            List<Map<String, Object>> farmerPickups,
+            double[] warehouseCoords,
+            double[] buyerCoords,
+            Double capacityKg) {
+
+        if (farmerPickups == null || farmerPickups.isEmpty()) {
+            throw new IllegalArgumentException("Farmer pickups are required for consolidation");
+        }
+        if (warehouseCoords == null || warehouseCoords.length < 2) {
+            throw new IllegalArgumentException("Warehouse coordinates are required");
+        }
+        if (buyerCoords == null || buyerCoords.length < 2) {
+            throw new IllegalArgumentException("Buyer coordinates are required");
+        }
+
+        // Leg 1: Collection circuit visiting farmer pickups with warehouse as origin
+        Map<String, Object> leg1 = optimize(List.of(warehouseCoords), farmerPickups, capacityKg);
+
+        // Leg 2: Warehouse to Buyer bulk haul
+        Map<String, Object> buyerStop = new LinkedHashMap<>();
+        buyerStop.put("lat", buyerCoords[0]);
+        buyerStop.put("lng", buyerCoords[1]);
+        buyerStop.put("label", "Buyer Destination");
+        buyerStop.put("weightKg", leg1.get("totalWeightKg"));
+
+        Map<String, Object> leg2 = optimize(List.of(warehouseCoords), List.of(buyerStop), capacityKg);
+
+        double dist1 = leg1.get("distanceKm") instanceof Number n1 ? n1.doubleValue() : 0.0;
+        double dist2 = leg2.get("distanceKm") instanceof Number n2 ? n2.doubleValue() : 0.0;
+        double dur1 = leg1.get("durationMinutes") instanceof Number d1 ? d1.doubleValue() : 0.0;
+        double dur2 = leg2.get("durationMinutes") instanceof Number d2 ? d2.doubleValue() : 0.0;
+        double cost1 = leg1.get("estimatedCost") instanceof Number c1 ? c1.doubleValue() : 0.0;
+        double cost2 = leg2.get("estimatedCost") instanceof Number c2 ? c2.doubleValue() : 0.0;
+
+        Map<String, Object> combined = new LinkedHashMap<>();
+        combined.put("mode", "CONSOLIDATION_HUB");
+        combined.put("totalDistanceKm", Math.round((dist1 + dist2) * 10.0) / 10.0);
+        combined.put("totalDurationMinutes", Math.round(dur1 + dur2));
+        combined.put("totalEstimatedCost", Math.round((cost1 + cost2) * 100.0) / 100.0);
+        combined.put("totalWeightKg", leg1.get("totalWeightKg"));
+        combined.put("capacityKg", leg1.get("capacityKg"));
+        combined.put("leg1DistanceKm", Math.round(dist1 * 10.0) / 10.0);
+        combined.put("leg2DistanceKm", Math.round(dist2 * 10.0) / 10.0);
+        combined.put("orderedStops", leg1.get("orderedStops"));
+        combined.put("leg1_collection", leg1);
+        combined.put("leg2_bulkHaul", leg2);
+        combined.put("summary", "Consolidated via Hub: " + Math.round((dist1 + dist2) * 10.0) / 10.0 + " km across 2 legs");
+
+        return combined;
+    }
+
     private double weightKg(Map<String, Object> stop) {
-        Object w = stop.get("weightKg");
-        if (w == null) return 0.0;
-        try { return ((Number) w).doubleValue(); } catch (Exception e) { return 0.0; }
+        return asDouble(stop.get("weightKg"));
+    }
+
+    private static double asDouble(Object val) {
+        if (val instanceof Number n) return n.doubleValue();
+        if (val != null) {
+            try { return Double.parseDouble(val.toString()); } catch (NumberFormatException ignored) {}
+        }
+        return 0.0;
     }
 }

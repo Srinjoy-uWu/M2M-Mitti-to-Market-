@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, PlusCircle, Brain, ShoppingCart, ClipboardList, Truck, Wallet, User, Bell, Settings, LogOut, Search, FileText, Heart, BarChart3, X, Menu, TrendingUp, MessageCircle, Trophy, ClipboardCheck, Save, MapPin, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Package, PlusCircle, Brain, ShoppingCart, ClipboardList, Truck, Wallet, User, Bell, Settings, LogOut, Search, FileText, Heart, BarChart3, X, Menu, TrendingUp, MessageCircle, Trophy, ClipboardCheck, Save, MapPin, Sparkles, Warehouse } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import M2MLogo from './M2MLogo';
 import NotificationPanel from './NotificationPanel';
@@ -17,6 +17,7 @@ const farmerLinks = [
   { to: '/farmer/deal-advisor', icon: Trophy, label: 'AI Deal Advisor' },
   { to: '/farmer/orders', icon: ClipboardList, label: 'Orders' },
   { to: '/farmer/logistics', icon: Truck, label: 'Logistics' },
+  { to: '/warehouses', icon: Warehouse, label: 'Warehouse Hubs' },
   { to: '/farmer/earnings', icon: Wallet, label: 'Earnings' },
   { to: '/farmer/chat', icon: MessageCircle, label: 'Messages' },
   { to: '/farmer/deals', icon: Package, label: 'My Deals' },
@@ -43,6 +44,7 @@ const businessLinks = [
   { to: '/business/requirements', icon: ClipboardCheck, label: 'My Requirements' },
   { to: '/business/orders', icon: ClipboardList, label: 'My Orders' },
   { to: '/business/logistics', icon: Truck, label: 'Logistics' },
+  { to: '/warehouses', icon: Warehouse, label: 'Warehouse Hubs' },
   { to: '/business/suppliers', icon: Heart, label: 'Saved Suppliers' },
   { to: '/business/insights', icon: TrendingUp, label: 'Market Insights' },
   { to: '/business/analytics', icon: BarChart3, label: 'Analytics' },

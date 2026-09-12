@@ -433,4 +433,18 @@ export default {
   calculatingRoute: 'Calculating real road route...',
   routeInfo: 'Select pickup locations and a destination to calculate the route.',
   selectForRoutes: 'Select locations to see route options',
+
+  /* ─── Disputes ─── */
+  raiseDispute: 'Raise Dispute',
+  disputeHistory: 'Disputes & Claims',
+  disputeReasonQuality: 'Quality Issue',
+  disputeReasonQuantity: 'Quantity Shortage',
+  disputeReasonDamage: 'Damaged in Transit',
+  disputeReasonLate: 'Late Delivery',
+  disputeReasonMissing: 'Missing Consignment',
+  disputeReasonPayment: 'Payment Discrepancy',
+  disputeStatusOpen: 'Open',
+  disputeStatusUnderReview: 'Under Review',
+  disputeStatusResolved: 'Resolved',
+  disputeStatusRejected: 'Rejected',
 };

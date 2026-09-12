@@ -9,6 +9,7 @@ import { useFarmerLanguage } from '../context/FarmerContext';
 import { useAuth } from '../context/AuthContext';
 import { calculateRoute, geocodeAddress } from '../api/locationApi';
 import { getFarmerDeals, getBuyerDeals } from '../api/dealApi';
+import { useRouteOptimization } from '../hooks/useRouteOptimization';
 
 /* ─────────────────────────────────────────────
    REFERENCE MANDIS & HUBS (Fallback destinations)
@@ -370,6 +371,15 @@ export default function MapRouteOptimizer() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState(null);
 
+  // Multi-stop capacity-aware optimizer hook
+  const {
+    loading: multiStopLoading,
+    error: multiStopError,
+    result: multiStopResult,
+    runOptimization: triggerMultiStopOptimization,
+    clear: clearMultiStop,
+  } = useRouteOptimization();
+
   // 1. Initialize Origin with registered location
   useEffect(() => {
     if (user?.latitude && user?.longitude) {
@@ -508,6 +518,41 @@ export default function MapRouteOptimizer() {
   }, [originPoint, destination, originMode, selectedDeal]);
 
   useEffect(() => { fetchRoutes(); }, [fetchRoutes]);
+
+  const handleOptimizeMultiStop = async () => {
+    if (!originPoint) return;
+    const stops = [];
+    if (activeDeals && activeDeals.length > 0) {
+      activeDeals.forEach((d) => {
+        if (d.deliveryLatitude && d.deliveryLongitude) {
+          stops.push({
+            lat: Number(d.deliveryLatitude),
+            lng: Number(d.deliveryLongitude),
+            label: `${d.cropName} (${d.buyerName || 'Dealer'})`,
+            weightKg: d.quantity || 500,
+          });
+        }
+      });
+    }
+    if (destination?.lat && destination?.lng) {
+      const alreadyIncluded = stops.some(s => Math.abs(s.lat - destination.lat) < 0.001 && Math.abs(s.lng - destination.lng) < 0.001);
+      if (!alreadyIncluded) {
+        stops.push({
+          lat: Number(destination.lat),
+          lng: Number(destination.lng),
+          label: destination.name || 'Destination Hub',
+          weightKg: Number(selectedDeal?.quantity || 500),
+        });
+      }
+    }
+    if (stops.length > 0) {
+      await triggerMultiStopOptimization({
+        origin: [originPoint.lat, originPoint.lng],
+        stops,
+        capacityKg: 5000,
+      });
+    }
+  };
 
   const allRoutes = routeData?.allRoutes || [];
 
@@ -823,6 +868,80 @@ export default function MapRouteOptimizer() {
               )}
             </div>
           )}
+
+          {/* Multi-Stop Capacity Optimizer */}
+          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-navy-900 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                Multi-Stop Fleet Optimization
+              </span>
+              <span className="text-[10px] font-mono text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                Nearest-Neighbor
+              </span>
+            </div>
+            <p className="text-[11px] text-navy-600 leading-normal">
+              Calculates capacity-aware multi-delivery order across active deal stops using real vehicle load constraints.
+            </p>
+
+            {multiStopError && (
+              <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">{multiStopError}</p>
+            )}
+
+            <button
+              type="button"
+              disabled={multiStopLoading || !originPoint}
+              onClick={handleOptimizeMultiStop}
+              className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition flex items-center justify-center gap-1.5 text-xs shadow-xs"
+            >
+              {multiStopLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Optimizing stops...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  Optimize Multi-Stop Route
+                </>
+              )}
+            </button>
+
+            {multiStopResult && (
+              <div className="pt-2 border-t border-blue-200 space-y-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-2 font-mono">
+                  <div className="bg-white p-2 rounded-lg border border-blue-100">
+                    <span className="text-gray-400 block text-[10px]">Total Distance</span>
+                    <strong className="text-navy-900 text-xs">{formatDistance(multiStopResult.distanceKm)}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-blue-100">
+                    <span className="text-gray-400 block text-[10px]">Est. Cost</span>
+                    <strong className="text-emerald-700 text-xs">₹{Number(multiStopResult.estimatedCost || 0).toLocaleString()}</strong>
+                  </div>
+                </div>
+
+                {Array.isArray(multiStopResult.orderedStops) && multiStopResult.orderedStops.length > 0 && (
+                  <div className="bg-white p-2 rounded-lg border border-blue-100 space-y-1">
+                    <span className="text-gray-400 text-[10px] uppercase font-bold tracking-wide block">Optimized Stop Order</span>
+                    <ol className="space-y-1 list-decimal list-inside text-navy-800">
+                      {multiStopResult.orderedStops.map((stop, idx) => (
+                        <li key={idx} className="truncate">
+                          <span className="font-semibold">{stop.label || `Stop ${idx + 1}`}</span>
+                          {stop.weightKg > 0 && <span className="text-gray-400 ml-1">({stop.weightKg} kg)</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {Array.isArray(multiStopResult.skippedStops) && multiStopResult.skippedStops.length > 0 && (
+                  <p className="text-[10px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                    ⚠️ Capacity exceeded: Skipped {multiStopResult.skippedStops.join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Map Display */}

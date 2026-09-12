@@ -2,19 +2,31 @@
 package com.mitti2market.config;
 
 import com.mitti2market.model.BuyerInterest;
+import com.mitti2market.model.Deal;
+import com.mitti2market.model.Dispute;
+import com.mitti2market.model.Logistics;
 import com.mitti2market.model.Produce;
 import com.mitti2market.model.Produce.ProduceStatus;
+import com.mitti2market.model.ReturnShipment;
 import com.mitti2market.model.User;
 import com.mitti2market.model.User.Role;
+import com.mitti2market.model.Warehouse;
 import com.mitti2market.repository.BuyerInterestRepository;
+import com.mitti2market.repository.DealRepository;
+import com.mitti2market.repository.DisputeRepository;
+import com.mitti2market.repository.LogisticsRepository;
 import com.mitti2market.repository.ProduceRepository;
+import com.mitti2market.repository.ReturnShipmentRepository;
 import com.mitti2market.repository.UserRepository;
+import com.mitti2market.repository.WarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Slf4j
 @Component
@@ -25,6 +37,11 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ProduceRepository produceRepository;
     private final BuyerInterestRepository interestRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final DealRepository dealRepository;
+    private final LogisticsRepository logisticsRepository;
+    private final DisputeRepository disputeRepository;
+    private final ReturnShipmentRepository returnShipmentRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -433,6 +450,9 @@ public class DataSeeder implements CommandLineRunner {
                 "ITC Choupal direct procurement at ₹28.5/kg for 1200 kg."
         );
 
+        seedSampleWarehouses();
+        seedSampleDeals(farmer1, business1);
+
         log.info("==============================================");
         log.info("Mitti2Market development data seeding complete");
         log.info("Admin     : admin@mitti2market.com");
@@ -587,6 +607,140 @@ public class DataSeeder implements CommandLineRunner {
                     produce.getName(),
                     offeredPrice
             );
+        }
+    }
+
+    private void seedSampleWarehouses() {
+        if (warehouseRepository.count() > 0) {
+            return;
+        }
+
+        List<Warehouse> hubs = List.of(
+                Warehouse.builder()
+                        .name("Nashik Agro Consolidation Hub")
+                        .ownerType(Warehouse.WarehouseOwnerType.PLATFORM)
+                        .address("Plot 42, MIDC Ambad, Nashik, Maharashtra 422010")
+                        .latitude(19.9975)
+                        .longitude(73.7898)
+                        .capacityKg(100000.0)
+                        .contactPerson("Sunil Deshmukh")
+                        .contactPhone("9823011223")
+                        .active(true)
+                        .build(),
+                Warehouse.builder()
+                        .name("Pune APMC Regional Aggregation Center")
+                        .ownerType(Warehouse.WarehouseOwnerType.PLATFORM)
+                        .address("Market Yard, Gultekdi, Pune, Maharashtra 411037")
+                        .latitude(18.4965)
+                        .longitude(73.8670)
+                        .capacityKg(150000.0)
+                        .contactPerson("Rajesh Kadam")
+                        .contactPhone("9822055667")
+                        .active(true)
+                        .build(),
+                Warehouse.builder()
+                        .name("Azadpur Cold Storage & Consolidation Hub")
+                        .ownerType(Warehouse.WarehouseOwnerType.PLATFORM)
+                        .address("Gate 4, New Subzi Mandi, Azadpur, Delhi 110033")
+                        .latitude(28.7164)
+                        .longitude(77.1738)
+                        .capacityKg(250000.0)
+                        .contactPerson("Virender Sharma")
+                        .contactPhone("9811099887")
+                        .active(true)
+                        .build(),
+                Warehouse.builder()
+                        .name("Vashi Navi Mumbai Multi-Commodity Hub")
+                        .ownerType(Warehouse.WarehouseOwnerType.PLATFORM)
+                        .address("Sector 19, APMC Grain Market, Vashi, Navi Mumbai 400705")
+                        .latitude(19.0760)
+                        .longitude(73.0039)
+                        .capacityKg(200000.0)
+                        .contactPerson("Mahesh Patel")
+                        .contactPhone("9820033445")
+                        .active(true)
+                        .build()
+        );
+
+        warehouseRepository.saveAll(hubs);
+        log.info("Seeded {} regional aggregation warehouse hubs", hubs.size());
+    }
+
+    private void seedSampleDeals(User farmer, User buyer) {
+        if (dealRepository.count() == 0 && farmer != null && buyer != null) {
+            List<Warehouse> hubs = warehouseRepository.findAll();
+
+            Deal deal1 = Deal.builder()
+                    .dealId("M2M-2026-10001")
+                    .farmer(farmer)
+                    .buyer(buyer)
+                    .cropName("Fresh Red Tomatoes")
+                    .quantity(2500)
+                    .unit("kg")
+                    .agreedPrice(24.0)
+                    .totalAmount(60000.0)
+                    .pickupLocation("Ramesh Kumar Farm, Dindori, Nashik")
+                    .pickupLatitude(20.08)
+                    .pickupLongitude(73.82)
+                    .deliveryLocation("FreshMart Central Depot, Andheri West, Mumbai")
+                    .deliveryLatitude(19.11)
+                    .deliveryLongitude(72.85)
+                    .status(Deal.DealStatus.IN_TRANSIT)
+                    .conversationId("conv_ramesh_freshmart_1")
+                    .build();
+
+            dealRepository.save(deal1);
+
+            Logistics log1 = Logistics.builder()
+                    .deal(deal1)
+                    .trackingId("M2M-TRK-77001")
+                    .type(Logistics.LogisticsType.MITTI2MARKET)
+                    .status(Logistics.LogisticsStatus.IN_TRANSIT)
+                    .pickupLocation("Ramesh Kumar Farm, Dindori, Nashik")
+                    .pickupLatitude(20.08)
+                    .pickupLongitude(73.82)
+                    .deliveryLocation("FreshMart Central Depot, Andheri West, Mumbai")
+                    .deliveryLatitude(19.11)
+                    .deliveryLongitude(72.85)
+                    .routeDistanceKm(165.4)
+                    .routeEstimatedCost(2840.0)
+                    .vehicleNumber("MH-15-EG-4421")
+                    .transporterName("M2M Cold-Express Freight")
+                    .warehouse(hubs.isEmpty() ? null : hubs.get(0))
+                    .build();
+
+            logisticsRepository.save(log1);
+
+            Dispute disp1 = Dispute.builder()
+                    .dealId(deal1.getId())
+                    .raisedBy(buyer)
+                    .reason(Dispute.DisputeReason.DAMAGED_GOODS)
+                    .description("Transit inspection noted 350 kg crushed tomatoes due to crate shifting.")
+                    .status(Dispute.DisputeStatus.UNDER_REVIEW)
+                    .build();
+
+            disputeRepository.save(disp1);
+
+            ReturnShipment ret1 = ReturnShipment.builder()
+                    .dealId(deal1.getId())
+                    .originalLogisticsId(log1.getId())
+                    .disputeId(disp1.getId())
+                    .trackingId("M2M-RET-88401A")
+                    .status(ReturnShipment.ReturnStatus.IN_TRANSIT)
+                    .reason("Transit cargo damage (350 kg)")
+                    .description("Reverse freight routing from FreshMart Mumbai back to Ramesh Kumar Farm in Nashik.")
+                    .fromLocation("FreshMart Central Depot, Andheri West, Mumbai")
+                    .fromLatitude(19.11)
+                    .fromLongitude(72.85)
+                    .toLocation("Ramesh Kumar Farm, Dindori, Nashik")
+                    .toLatitude(20.08)
+                    .toLongitude(73.82)
+                    .routeDistanceKm(165.4)
+                    .routeEstimatedCost(2250.0)
+                    .build();
+
+            returnShipmentRepository.save(ret1);
+            log.info("Seeded sample deal M2M-2026-10001 with logistics, dispute, and return shipment");
         }
     }
 }

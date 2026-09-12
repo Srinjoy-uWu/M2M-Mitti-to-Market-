@@ -602,6 +602,17 @@ public class LogisticsService {
     }
 
     /**
+     * Multi-leg consolidation route optimization via an aggregation warehouse hub.
+     */
+    public Map<String, Object> optimizeRouteViaWarehouse(
+            List<Map<String, Object>> farmerPickups,
+            double[] warehouseCoords,
+            double[] buyerCoords,
+            Double capacityKg) {
+        return routeOptimizer.optimizeViaWarehouse(farmerPickups, warehouseCoords, buyerCoords, capacityKg);
+    }
+
+    /**
      * All logistics records where the user is the farmer or buyer —
      * uses an efficient JPA query instead of loading all records.
      */

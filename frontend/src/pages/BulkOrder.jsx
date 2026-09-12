@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { FileText, MapPin, Package, Calendar, Search, AlertCircle, CheckCircle2, Loader2, Truck, ExternalLink } from 'lucide-react';
+import { FileText, MapPin, Package, Calendar, Search, AlertCircle, CheckCircle2, Loader2, Truck, ExternalLink, Warehouse } from 'lucide-react';
 import { apiGet, apiPost } from '../api';
+import { getActiveWarehouses } from '../api/warehouseApi';
 
 const FALLBACK_CROPS = ['Tomato', 'Onion', 'Potato', 'Rice', 'Wheat', 'Chilli', 'Mango', 'Grapes'];
 
@@ -36,8 +37,11 @@ export default function BulkOrder() {
   const [success, setSuccess] = useState('');
   const [matches, setMatches] = useState(null); // { requirementId, supply[] }
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [warehouses, setWarehouses] = useState([]);
+  const [consolidateViaHub, setConsolidateViaHub] = useState(false);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
 
-  // Load real crop names from the marketplace for the product dropdown
+  // Load real crop names and active warehouse consolidation hubs
   useEffect(() => {
     apiGet('/api/produce/paged?availableOnly=true&size=100')
       .then((data) => {
@@ -45,6 +49,15 @@ export default function BulkOrder() {
         if (names.length) setCropOptions(names);
       })
       .catch(() => { /* keep fallback list */ });
+
+    getActiveWarehouses()
+      .then((data) => {
+        if (data && data.length > 0) {
+          setWarehouses(data);
+          setSelectedWarehouseId(String(data[0].id));
+        }
+      })
+      .catch(() => { /* keep empty */ });
   }, []);
 
   const handleSubmit = async (e) => {
@@ -58,6 +71,13 @@ export default function BulkOrder() {
     setSuccess('');
     setMatches(null);
     try {
+      let finalNotes = form.notes;
+      if (consolidateViaHub && selectedWarehouseId) {
+        const wh = warehouses.find((w) => String(w.id) === String(selectedWarehouseId));
+        const hubInfo = wh ? ` [Consolidate via Hub: ${wh.name} (${wh.city}, ${wh.state})]` : ' [Consolidate via Regional Hub]';
+        finalNotes = finalNotes ? `${finalNotes}${hubInfo}` : hubInfo.trim();
+      }
+
       const req = await apiPost('/api/requirements', {
         crop: form.product,
         quantity: Number(form.quantity),
@@ -67,8 +87,8 @@ export default function BulkOrder() {
         quality: form.quality,
         requiredBy: form.requiredBy,
         deliveryLocation: form.deliveryLocation,
-        transportPreference: 'PLATFORM',
-        notes: form.notes,
+        transportPreference: consolidateViaHub ? 'WAREHOUSE_HUB' : 'PLATFORM',
+        notes: finalNotes,
       });
       setForm({ product: '', quantity: '', targetPrice: '', requiredBy: '', quality: 'Grade A', deliveryLocation: '', notes: '' });
       setSuccess(`Bulk request posted! Requirement #${req.id} for ${req.crop} is now visible to farmers.`);
@@ -211,6 +231,45 @@ export default function BulkOrder() {
                     </div>
                   </div>
 
+                  {/* Regional Consolidation Hub Option */}
+                  <div className="p-4 bg-navy-50/60 rounded-2xl border border-navy-100 space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={consolidateViaHub}
+                        onChange={(e) => setConsolidateViaHub(e.target.checked)}
+                        className="w-4 h-4 text-navy-900 rounded border-gray-300 focus:ring-navy-800"
+                      />
+                      <span className="text-sm font-semibold text-navy-900 flex items-center gap-1.5">
+                        <Warehouse className="w-4 h-4 text-navy-700" />
+                        Consolidate via Regional Warehouse Hub
+                      </span>
+                    </label>
+
+                    {consolidateViaHub && (
+                      <div className="space-y-2 pt-2 border-t border-navy-100">
+                        <p className="text-xs text-gray-500">
+                          Smallholder farmer batches will aggregate at this regional hub before single-carrier long-haul freight to your destination.
+                        </p>
+                        {warehouses.length === 0 ? (
+                          <p className="text-xs text-amber-600">No regional hubs currently active.</p>
+                        ) : (
+                          <select
+                            value={selectedWarehouseId}
+                            onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-navy-200 rounded-xl text-xs text-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-800"
+                          >
+                            {warehouses.map((wh) => (
+                              <option key={wh.id} value={wh.id}>
+                                {wh.name} — {wh.city}, {wh.state} ({wh.hasColdStorage ? 'Cold Storage' : 'Ambient'})
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Additional Notes</label>
                     <textarea
@@ -256,6 +315,29 @@ export default function BulkOrder() {
 
               {!loadingMatches && matches && (
                 <div className="space-y-3">
+                  {matches.supply.length > 1 && (
+                    <div className="p-3.5 bg-mustard-100/70 border border-mustard-300 rounded-2xl text-xs text-navy-900">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold flex items-center gap-1">
+                          <Warehouse className="w-4 h-4 text-navy-800" /> Multi-Farmer Aggregation
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 bg-mustard-200 text-navy-900 rounded-full">
+                          {matches.supply.length} Sources
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mt-1">
+                        Pool supply across {matches.supply.length} farmers ({matches.supply.reduce((sum, s) => sum + (s.availableQuantity || 0), 0)} kg total) into a regional consolidation hub to reduce transit freight.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/warehouses')}
+                        className="mt-2 text-xs font-bold text-navy-900 hover:underline flex items-center gap-1"
+                      >
+                        Open Regional Hub Optimizer →
+                      </button>
+                    </div>
+                  )}
+
                   {matches.supply.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-navy-100 p-8 text-center">
                       <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />

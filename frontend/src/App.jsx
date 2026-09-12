@@ -48,6 +48,7 @@ import FarmerMatches from './pages/FarmerMatches';
 import MessagePopup from './components/MessagePopup';
 import LiveNotificationToast from './components/LiveNotificationToast';
 import Locations from './pages/Locations';
+import Warehouses from './pages/Warehouses';
 import RoleChoiceModal from './components/RoleChoiceModal';
 import AuthRequiredModal from './components/AuthRequiredModal';
 import AdminLayout from './components/admin/AdminLayout';
@@ -270,8 +271,9 @@ export default function App() {
             <Route path="settings" element={<AdminSettings />} />
           </Route>
 
-          {/* Live Locations — shared by farmer & buyer */}
+          {/* Live Locations & Warehouses — shared by farmer & buyer */}
           <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
+          <Route path="/warehouses" element={<ProtectedRoute><Warehouses /></ProtectedRoute>} />
 
           {/* Business Routes — protected by role */}
           <Route path="/business" element={<ProtectedRoute role="business"><Outlet /></ProtectedRoute>}>

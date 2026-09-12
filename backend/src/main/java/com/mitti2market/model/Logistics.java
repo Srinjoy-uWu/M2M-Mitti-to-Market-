@@ -25,6 +25,10 @@ public class Logistics {
     @JoinColumn(name = "deal_id", nullable = false)
     private Deal deal;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse warehouse;
+
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private LogisticsType type = LogisticsType.OWN;

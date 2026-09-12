@@ -42,7 +42,16 @@ public class DealService {
     @PostConstruct
     public void initCounter() {
         try {
-            long max = deals.findMaxDealSequence();
+            long max = 10000;
+            for (Deal d : deals.findAll()) {
+                if (d.getDealId() != null && d.getDealId().contains("-")) {
+                    String[] parts = d.getDealId().split("-");
+                    try {
+                        long seq = Long.parseLong(parts[parts.length - 1]);
+                        if (seq > max) max = seq;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
             if (max > 10000) {
                 DEAL_COUNTER.set(max);
             }
