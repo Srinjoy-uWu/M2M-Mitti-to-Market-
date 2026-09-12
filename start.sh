@@ -12,50 +12,53 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_ENV="$SCRIPT_DIR/backend/.env"
 FRONTEND_ENV="$SCRIPT_DIR/frontend/.env"
 
-# ─── Check .env files exist ──────────────────────────────────
-if [ ! -f "$BACKEND_ENV" ]; then
-    echo "❌ backend/.env not found!"
-    echo "   Copy backend/.env.example to backend/.env"
-    exit 1
+# ─── Optional: Load backend .env ──────────────────────────────
+if [ -f "$BACKEND_ENV" ]; then
+    echo "📂 Loading backend/.env..."
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs)
+        value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
+        export "$key=$value"
+    done < "$BACKEND_ENV"
 fi
 
-if [ ! -f "$FRONTEND_ENV" ]; then
-    echo "❌ frontend/.env not found!"
-    echo "   Copy frontend/.env.example to frontend/.env"
-    exit 1
+# ─── Optional: Load frontend .env ─────────────────────────────
+if [ -f "$FRONTEND_ENV" ]; then
+    echo "📂 Loading frontend/.env..."
+    while IFS='=' read -r key value; do
+        [[ "$key" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$key" ]] && continue
+        key=$(echo "$key" | xargs)
+        value=$(echo "$value" | xargs)
+        value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
+        export "$key=$value"
+    done < "$FRONTEND_ENV"
 fi
 
-# ─── Load backend .env ───────────────────────────────────────
-echo "📂 Loading backend/.env..."
-while IFS='=' read -r key value; do
-    [[ "$key" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$key" ]] && continue
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs)
-    value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
-    export "$key=$value"
-done < "$BACKEND_ENV"
-
-# ─── Load frontend .env ──────────────────────────────────────
-echo "📂 Loading frontend/.env..."
-while IFS='=' read -r key value; do
-    [[ "$key" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$key" ]] && continue
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs)
-    value="${value#\"}"; value="${value%\"}"; value="${value#\'}"; value="${value%\'}"
-    export "$key=$value"
-done < "$FRONTEND_ENV"
-
-echo "✅ Environment loaded"
+echo "✅ Environment configured"
 echo "   Backend:  http://localhost:${SERVER_PORT:-8080}"
 echo "   Frontend: http://localhost:5173"
 echo ""
 
+# ─── Ensure frontend dependencies exist ───────────────────────
+if [ ! -d "$SCRIPT_DIR/frontend/node_modules" ]; then
+    echo "📦 Installing frontend dependencies..."
+    cd "$SCRIPT_DIR/frontend" && npm install
+fi
+
 # ─── Start Backend ───────────────────────────────────────────
 echo "🚀 Starting Backend..."
 cd "$SCRIPT_DIR/backend"
-mvn spring-boot:run &
+if [ -x "./mvnw" ]; then
+    ./mvnw spring-boot:run &
+elif [ -f "./mvnw" ]; then
+    sh ./mvnw spring-boot:run &
+else
+    mvn spring-boot:run &
+fi
 BACKEND_PID=$!
 
 # ─── Wait for backend to be ready ────────────────────────────

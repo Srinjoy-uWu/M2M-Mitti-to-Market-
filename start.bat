@@ -1,69 +1,73 @@
 @echo off
+setlocal enabledelayedexpansion
 REM ═══════════════════════════════════════════════════════════════
 REM Mitti2Market — Start Script (Windows)
 REM ═══════════════════════════════════════════════════════════════
-REM Loads backend/.env and frontend/.env, then starts both services.
-REM Usage: start.bat
+REM Automatically starts both Backend and Frontend services.
+REM Usage: double-click start.bat or run .\start.bat
 REM ═══════════════════════════════════════════════════════════════
 
-if not exist backend\.env (
-    echo ERROR: backend/.env not found!
-    echo Copy backend/.env to backend/.env and fill in your values.
-    exit /b 1
-)
-
-if not exist frontend\.env (
-    echo ERROR: frontend/.env not found!
-    echo Copy frontend/.env.example to frontend/.env and fill in your values.
-    exit /b 1
-)
-
-echo Loading backend/.env...
-
-REM ─── Load backend .env ─────────────────────────────────────
-for /f "usebackq tokens=1,* delims==" %%A in ("backend\.env") do (
-    set "line=%%A"
-    if not "!line:~0,1!"=="#" (
-        if not "%%A"=="" set "%%A=%%B"
+REM ─── Optional: Load backend .env if present ─────────────────────
+if exist backend\.env (
+    echo Loading backend\.env...
+    for /f "usebackq tokens=1,* delims==" %%A in ("backend\.env") do (
+        set "line=%%A"
+        if not "!line:~0,1!"=="#" (
+            if not "%%A"=="" set "%%A=%%B"
+        )
     )
 )
 
-echo Loading frontend/.env...
-
-REM ─── Load frontend .env ────────────────────────────────────
-for /f "usebackq tokens=1,* delims==" %%A in ("frontend\.env") do (
-    set "line=%%A"
-    if not "!line:~0,1!"=="#" (
-        if not "%%A"=="" set "%%A=%%B"
+REM ─── Optional: Load frontend .env if present ────────────────────
+if exist frontend\.env (
+    echo Loading frontend\.env...
+    for /f "usebackq tokens=1,* delims==" %%A in ("frontend\.env") do (
+        set "line=%%A"
+        if not "!line:~0,1!"=="#" (
+            if not "%%A"=="" set "%%A=%%B"
+        )
     )
 )
+
+if "%SERVER_PORT%"=="" set SERVER_PORT=8080
 
 echo.
-echo ========================================
+echo ===============================================================
 echo   Mitti2Market Starting...
 echo   Backend:  http://localhost:%SERVER_PORT%
 echo   Frontend: http://localhost:5173
-echo ========================================
+echo ===============================================================
 echo.
 
-REM ─── Start Backend ─────────────────────────────────────────
-echo Starting Backend...
-start "M2M-Backend" cmd /c "cd backend && mvn spring-boot:run"
+REM ─── Ensure frontend dependencies exist ─────────────────────────
+if not exist frontend\node_modules (
+    echo [Frontend] Installing dependencies (first run)...
+    cd frontend && call npm install && cd ..
+)
 
-REM ─── Wait for backend ──────────────────────────────────────
-echo Waiting for backend...
+REM ─── Start Backend ──────────────────────────────────────────────
+echo Starting Backend...
+if exist backend\mvnw.cmd (
+    start "M2M-Backend" cmd /k "cd backend && mvnw.cmd spring-boot:run"
+) else (
+    start "M2M-Backend" cmd /k "cd backend && mvn spring-boot:run"
+)
+
+REM ─── Wait for backend ───────────────────────────────────────────
+echo Waiting for backend to initialize (15 seconds)...
 timeout /t 15 /nobreak >nul
 
-REM ─── Start Frontend ────────────────────────────────────────
+REM ─── Start Frontend ─────────────────────────────────────────────
 echo Starting Frontend...
-start "M2M-Frontend" cmd /c "cd frontend && npm run dev"
+start "M2M-Frontend" cmd /k "cd frontend && npm run dev"
 
 echo.
-echo ========================================
+echo ===============================================================
 echo   Both services started!
 echo   Frontend: http://localhost:5173
 echo   Backend:  http://localhost:%SERVER_PORT%
+echo   Swagger:  http://localhost:%SERVER_PORT%/swagger-ui/index.html
 echo.
-echo   Close the terminal windows to stop.
-echo ========================================
+echo   Keep the terminal windows open while using the application.
+echo ===============================================================
 pause
