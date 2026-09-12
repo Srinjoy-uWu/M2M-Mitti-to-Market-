@@ -64,22 +64,6 @@ export default function DealWorkspace() {
   const navigate = useNavigate();
   const { user, isGuestModeActive, openAuthRequired } = useAuth();
 
-  if (isGuestModeActive) {
-    return (
-      <div className="flex min-h-screen bg-mustard-50/30">
-        <Sidebar role="farmer" />
-        <main className="flex-1 p-8 lg:pl-0 flex items-center justify-center">
-          <div className="text-center">
-            <span className="text-4xl block mb-4">🤝</span>
-            <p className="text-lg font-semibold text-gray-700 mb-2">Sign in to view deals</p>
-            <p className="text-sm text-gray-500 mb-4">You need an account to manage deals.</p>
-            <button onClick={openAuthRequired} className="px-6 py-3 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition">Sign In</button>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   const [deal, setDeal] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [logistics, setLogistics] = useState(null);
@@ -104,7 +88,7 @@ export default function DealWorkspace() {
 
   // Check if this user already rated the deal (one rating per party per completed deal)
   useEffect(() => {
-    if (deal?.status === 'COMPLETED' && dealId) {
+    if (deal?.status === 'COMPLETED' && dealId && !isGuestModeActive) {
       getDealRatings(dealId).then((res) => {
         if (res.ok && Array.isArray(res.data)) {
           const mine = res.data.find((r) => r.reviewerId === user?.id || r.raterId === user?.id || (r.reviewer && r.reviewer.id === user?.id));
@@ -113,10 +97,10 @@ export default function DealWorkspace() {
         }
       });
     }
-  }, [deal?.status, dealId, user?.id]);
+  }, [deal?.status, dealId, user?.id, isGuestModeActive]);
 
   const load = () => {
-    if (!dealId || !user) return;
+    if (!dealId || !user || isGuestModeActive) return;
     setLoading(true);
     setError('');
     Promise.allSettled([
@@ -144,7 +128,23 @@ export default function DealWorkspace() {
     });
   };
 
-  useEffect(load, [dealId, user]);
+  useEffect(load, [dealId, user, isGuestModeActive]);
+
+  if (isGuestModeActive) {
+    return (
+      <div className="flex min-h-screen bg-mustard-50/30">
+        <Sidebar role="farmer" />
+        <main className="flex-1 p-8 lg:pl-0 flex items-center justify-center">
+          <div className="text-center">
+            <span className="text-4xl block mb-4">🤝</span>
+            <p className="text-lg font-semibold text-gray-700 mb-2">Sign in to view deals</p>
+            <p className="text-sm text-gray-500 mb-4">You need an account to manage deals.</p>
+            <button onClick={openAuthRequired} className="px-6 py-3 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition">Sign In</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   // Lightweight logistics-only refresh (used after tracking actions)
   const refreshLogistics = () => {

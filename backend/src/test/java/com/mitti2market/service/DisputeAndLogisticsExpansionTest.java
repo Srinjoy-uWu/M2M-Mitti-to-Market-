@@ -163,6 +163,38 @@ public class DisputeAndLogisticsExpansionTest {
         assertEquals(ReturnShipment.ReturnStatus.RETURNED, shipment.getStatus());
     }
 
+    @Test
+    void testWarehouseActiveOnlyFilter() {
+        Warehouse activeWh = Warehouse.builder()
+                .id(10L)
+                .name("Active Mandi Hub")
+                .address("Hub Road, Delhi")
+                .latitude(28.70)
+                .longitude(77.10)
+                .capacityKg(50000.0)
+                .active(true)
+                .build();
+
+        Warehouse inactiveWh = Warehouse.builder()
+                .id(11L)
+                .name("Decommissioned Hub")
+                .address("Old Closed Yard, Delhi")
+                .latitude(28.71)
+                .longitude(77.11)
+                .capacityKg(20000.0)
+                .active(false)
+                .build();
+
+        warehouseRepo.save(activeWh);
+        warehouseRepo.save(inactiveWh);
+
+        List<WarehouseResponse> results = warehouseService.findNearestTo(28.70, 77.10);
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals("Active Mandi Hub", results.get(0).getName());
+        assertEquals(0.0, results.get(0).getDistanceKm(), 0.1);
+    }
+
     /**
      * In-memory WarehouseRepository for fast isolated testing without DB setup.
      */

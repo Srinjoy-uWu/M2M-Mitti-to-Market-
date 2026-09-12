@@ -25,6 +25,22 @@ const STATUS_COLORS = {
 
 export default function OfflineDrafts() {
   const { user, isGuestModeActive, openAuthRequired } = useAuth();
+  const navigate = useNavigate();
+  const [drafts, setDrafts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const status = useSyncStatus();
+
+  const role = user?.role?.toLowerCase() === 'farmer' ? 'farmer' : 'business';
+
+  const load = async () => {
+    if (!user || isGuestModeActive) { setLoading(false); return; }
+    try {
+      setDrafts(await getDraftsForUser(user.id));
+    } catch { setDrafts([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [user, isGuestModeActive]);
 
   if (isGuestModeActive) {
     return (
@@ -41,22 +57,6 @@ export default function OfflineDrafts() {
       </div>
     );
   }
-  const navigate = useNavigate();
-  const [drafts, setDrafts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const status = useSyncStatus();
-
-  const role = user?.role?.toLowerCase() === 'farmer' ? 'farmer' : 'business';
-
-  const load = async () => {
-    if (!user) { setLoading(false); return; }
-    try {
-      setDrafts(await getDraftsForUser(user.id));
-    } catch { setDrafts([]); }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [user]);
 
   // Refresh list when global sync status changes (pending/syncing/failed counts)
   useEffect(() => { if (!status.syncing) load(); /* eslint-disable-line */ }, [status.pending, status.syncing, status.failed]);

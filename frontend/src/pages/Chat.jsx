@@ -18,21 +18,6 @@ export default function Chat() {
   const navigate = useNavigate();
   const { conversationId, otherUserId } = useParams();
 
-  if (isGuestModeActive) {
-    return (
-      <div className="flex min-h-screen bg-mustard-50/30">
-        <Sidebar role="farmer" />
-        <main className="flex-1 p-8 lg:pl-0 flex items-center justify-center">
-          <div className="text-center">
-            <span className="text-4xl block mb-4">💬</span>
-            <p className="text-lg font-semibold text-gray-700 mb-2">Sign in to use Messages</p>
-            <p className="text-sm text-gray-500 mb-4">You need an account to chat with farmers and buyers.</p>
-            <button onClick={openAuthRequired} className="px-6 py-3 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition">Sign In</button>
-          </div>
-        </main>
-      </div>
-    );
-  }
   const messagesEndRef = useRef(null);
 
   const [conversations, setConversations] = useState([]);
@@ -55,7 +40,7 @@ export default function Chat() {
 
   // Load conversations list
   const loadConversations = async (showLoading = true) => {
-    if (!user) return;
+    if (!user || isGuestModeActive) return;
     if (showLoading) setLoading(true);
     try {
       const data = await apiGet('/api/messages/conversations');
@@ -70,20 +55,45 @@ export default function Chat() {
     }
   };
 
+  const loadMessages = async () => {
+    if (!conversationId || isGuestModeActive) return;
+    try {
+      const data = await apiGet(`/api/messages/${conversationId}`);
+      setMessages(data || []);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (err) {
+      if (err.message?.includes('Session expired')) {
+        navigate('/login', { state: { from: { pathname: `/${sidebarRole}/chat/${conversationId}/${otherUserId}` } } });
+      }
+    }
+  };
+
+  const loadOffers = async () => {
+    if (!conversationId || isGuestModeActive) return;
+    try {
+      const data = await getConversationOffers(conversationId);
+      setOffers(data || []);
+    } catch {
+      // Offers endpoint non-blocking
+    }
+  };
+
   // Load conversations on mount and when conversationId changes
   useEffect(() => {
+    if (isGuestModeActive) return;
     loadConversations();
-  }, [user, conversationId]);
+  }, [user, conversationId, isGuestModeActive]);
 
   // Poll conversations list even while in a chat (to show unread badges)
   useEffect(() => {
+    if (isGuestModeActive) return;
     const interval = setInterval(() => loadConversations(false), 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isGuestModeActive]);
 
   // Load messages when conversation is selected — poll for real-time
   useEffect(() => {
-    if (!conversationId || !user) return;
+    if (!conversationId || !user || isGuestModeActive) return;
     loadMessages();
     loadOffers();
     const interval = setInterval(() => {
@@ -92,11 +102,11 @@ export default function Chat() {
       loadConversations(false); // Also refresh conversation list for unread badges
     }, 2000);
     return () => clearInterval(interval);
-  }, [conversationId, user]);
+  }, [conversationId, user, isGuestModeActive]);
 
   // Real-time: SSE push — new messages pop up on screen instantly, no poll wait
   useEffect(() => {
-    if (!conversationId || !user) return;
+    if (!conversationId || !user || isGuestModeActive) return;
     const unsubscribe = onMessage((msg) => {
       if (!msg || msg.conversationId !== conversationId) return;
       if (String(msg.receiverId) !== String(user.id) && String(msg.senderId) !== String(user.id)) return;
@@ -116,28 +126,24 @@ export default function Chat() {
     });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, user]);
+  }, [conversationId, user, isGuestModeActive]);
 
-  const loadMessages = async () => {
-    if (!conversationId) return;
-    try {
-      const data = await apiGet(`/api/messages/${conversationId}`);
-      setMessages(data || []);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-    } catch (err) {
-      if (err.message?.includes('Session expired')) {
-        navigate('/login', { state: { from: { pathname: `/${sidebarRole}/chat/${conversationId}/${otherUserId}` } } });
-      }
-    }
-  };
+  if (isGuestModeActive) {
+    return (
+      <div className="flex min-h-screen bg-mustard-50/30">
+        <Sidebar role="farmer" />
+        <main className="flex-1 p-8 lg:pl-0 flex items-center justify-center">
+          <div className="text-center">
+            <span className="text-4xl block mb-4">💬</span>
+            <p className="text-lg font-semibold text-gray-700 mb-2">Sign in to use Messages</p>
+            <p className="text-sm text-gray-500 mb-4">You need an account to chat with farmers and buyers.</p>
+            <button onClick={openAuthRequired} className="px-6 py-3 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition">Sign In</button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
-  const loadOffers = async () => {
-    if (!conversationId) return;
-    try {
-      const data = await getConversationOffers(conversationId);
-      setOffers(data || []);
-    } catch {}
-  };
 
   const handleCreateOffer = async (e) => {
     e.preventDefault();

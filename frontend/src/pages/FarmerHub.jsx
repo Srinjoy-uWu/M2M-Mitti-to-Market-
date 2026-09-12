@@ -7,7 +7,7 @@ import {
   PlusCircle, Brain, ShoppingCart, Trophy, MapPin, Package,
   X, Camera, Image, FileImage, Loader2, TrendingUp, TrendingDown, Minus,
   Info, WifiOff, Save, CloudUpload, RefreshCw, ShieldCheck, ChevronDown,
-  ChevronUp, Wallet, MessageCircle, CheckCircle2, ClipboardList, AlertTriangle
+  ChevronUp, Wallet, MessageCircle, CheckCircle2, ClipboardList, AlertTriangle, Truck
 } from 'lucide-react';
 import { saveDraft, queueDraft, deleteDraft, getDraft, useSyncStatus } from '../utils/syncQueue';
 import { idbSupported } from '../utils/idb';

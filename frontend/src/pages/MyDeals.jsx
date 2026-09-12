@@ -29,6 +29,25 @@ const STATUS_FLOW = ['LOCK_PENDING','LOCKED','LOGISTICS_PENDING','LOGISTICS_ASSI
 
 export default function MyDeals() {
   const { user, isGuestModeActive, openAuthRequired } = useAuth();
+  const navigate = useNavigate();
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [ratingModalDeal, setRatingModalDeal] = useState(null);
+
+  const fetchDealsList = () => {
+    if (!user || isGuestModeActive) return;
+    const isFarmer = user.role === 'FARMER';
+    const fetchDeals = isFarmer ? getFarmerDeals : getBuyerDeals;
+    fetchDeals(user.id)
+      .then(data => setDeals(data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDealsList();
+  }, [user, isGuestModeActive]);
 
   if (isGuestModeActive) {
     return (
@@ -45,25 +64,6 @@ export default function MyDeals() {
       </div>
     );
   }
-  const navigate = useNavigate();
-  const [deals, setDeals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [ratingModalDeal, setRatingModalDeal] = useState(null);
-
-  const fetchDealsList = () => {
-    if (!user) return;
-    const isFarmer = user.role === 'FARMER';
-    const fetchDeals = isFarmer ? getFarmerDeals : getBuyerDeals;
-    fetchDeals(user.id)
-      .then(data => setDeals(data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchDealsList();
-  }, [user]);
 
   const isFarmer = user?.role === 'FARMER';
   const sidebarRole = isFarmer ? 'farmer' : 'business';

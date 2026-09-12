@@ -19,6 +19,50 @@ export default function FarmerMatches() {
   const { user, isGuestModeActive, openAuthRequired } = useAuth();
   const navigate = useNavigate();
 
+  const [activeTab, setActiveTab] = useState('new');
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [startingMatchId, setStartingMatchId] = useState(null);
+  const [selectedBuyer, setSelectedBuyer] = useState(null);
+
+  const fetchMatches = useCallback(async (showLoading = true) => {
+    if (!user || isGuestModeActive) return;
+    if (showLoading) setLoading(true);
+    setError('');
+    try {
+      const data = await apiGet(`/api/matches/farmer?filter=${activeTab}`);
+      setMatches(data || []);
+    } catch (err) {
+      if (err.message?.includes('Session expired')) {
+        navigate('/login', { state: { from: { pathname: '/farmer/matches' } } });
+        return;
+      }
+      setError(err.message || 'Failed to load matches');
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, [user, isGuestModeActive, activeTab, navigate]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
+
+  // Real-time wakeup & polling
+  useEffect(() => {
+    if (isGuestModeActive) return;
+    const unsubscribe = onNotification((notif) => {
+      if (notif.type === 'NEW_MATCH' || notif.type === 'MATCH_UPDATED') {
+        fetchMatches(false);
+      }
+    });
+    const interval = setInterval(() => fetchMatches(false), 8000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [fetchMatches, isGuestModeActive]);
+
   if (isGuestModeActive) {
     return (
       <div className="flex min-h-screen bg-mustard-50/30">
@@ -36,49 +80,6 @@ export default function FarmerMatches() {
       </div>
     );
   }
-
-  const [activeTab, setActiveTab] = useState('new');
-  const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [startingMatchId, setStartingMatchId] = useState(null);
-  const [selectedBuyer, setSelectedBuyer] = useState(null);
-
-  const fetchMatches = useCallback(async (showLoading = true) => {
-    if (!user) return;
-    if (showLoading) setLoading(true);
-    setError('');
-    try {
-      const data = await apiGet(`/api/matches/farmer?filter=${activeTab}`);
-      setMatches(data || []);
-    } catch (err) {
-      if (err.message?.includes('Session expired')) {
-        navigate('/login', { state: { from: { pathname: '/farmer/matches' } } });
-        return;
-      }
-      setError(err.message || 'Failed to load matches');
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [user, activeTab, navigate]);
-
-  useEffect(() => {
-    fetchMatches();
-  }, [fetchMatches]);
-
-  // Real-time wakeup & polling
-  useEffect(() => {
-    const unsubscribe = onNotification((notif) => {
-      if (notif.type === 'NEW_MATCH' || notif.type === 'MATCH_UPDATED') {
-        fetchMatches(false);
-      }
-    });
-    const interval = setInterval(() => fetchMatches(false), 8000);
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
-  }, [fetchMatches]);
 
   const handleStartDeal = async (matchId, isExisting = false) => {
     const match = matches.find(m => m.id === matchId);

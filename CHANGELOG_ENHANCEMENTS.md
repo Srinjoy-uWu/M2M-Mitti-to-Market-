@@ -145,6 +145,31 @@ The codebase required external MySQL and cloud storage configurations, preventin
 
 ---
 
+### 2.6. Frontend React 19 Hook Lifecycle & Build Hardening
+
+#### Problem Solved
+Stashed conflict markers in CSS and premature conditional returns before React hook declarations created hook order violations and build-time syntax errors. An undefined icon reference in `FarmerHub.jsx` also caused a potential runtime exception on produce analytics.
+
+#### Additions & Changes
+- **CSS Bundle Conflict Resolution (`frontend/src/index.css`)**:
+  - Removed git stash conflict markers, preserving both voice assistant animations and Google Maps modal suppression rules.
+- **Icon Dependency Fix (`frontend/src/pages/FarmerHub.jsx`)**:
+  - Added missing `Truck` icon import from `lucide-react`.
+- **Rules of Hooks Compliance**:
+  - Reordered component hooks to precede conditional returns across 7 pages:
+    - `DealWorkspace.jsx`
+    - `MyDeals.jsx`
+    - `OfflineDrafts.jsx`
+    - `BulkOrder.jsx`
+    - `FarmerMatches.jsx`
+    - `Chat.jsx`
+    - `AddProduce.jsx`
+  - Eliminated all 95 `react-hooks/rules-of-hooks` errors reported by `oxlint`.
+- **Unit Test Suite Expansion (`backend/.../service/DisputeAndLogisticsExpansionTest.java`)**:
+  - Added test case validating active-only filtering for warehouse hubs and zero-distance precision.
+
+---
+
 ## 3. Comprehensive File Inventory
 
 ### 3.1. Newly Created Files
@@ -189,12 +214,18 @@ The codebase required external MySQL and cloud storage configurations, preventin
 | `backend/.../service/LogisticsService.java` | Added bridge method for multi-leg consolidation routing |
 | `backend/.../service/RouteOptimizationService.java` | Implemented `optimizeViaWarehouse` two-leg routing algorithm |
 | `backend/.../service/TwoWayMatchingAndDealTest.java` | Added stub implementations for new repository methods |
+| `backend/.../service/DisputeAndLogisticsExpansionTest.java` | Added active-only filter and zero-distance test cases |
+| `frontend/src/index.css` | Resolved CSS conflict markers; restored animation and map styles |
 | `frontend/src/App.jsx` | Registered `/warehouses` page route |
 | `frontend/src/components/Sidebar.jsx` | Added "Warehouse Hubs" navigation items |
 | `frontend/src/components/MapRouteOptimizer.jsx` | Wired dynamic deal coordinates to backend optimizer |
-| `frontend/src/pages/DealWorkspace.jsx` | Mounted `DisputeModal`, `DisputeTimeline`, and `ReturnTracker` |
-| `frontend/src/pages/MyDeals.jsx` | Added visual dispute indicator badges |
-| `frontend/src/pages/BulkOrder.jsx` | Added hub consolidation opt-in toggle and hub selector |
+| `frontend/src/pages/DealWorkspace.jsx` | Mounted `DisputeModal`, `DisputeTimeline`, `ReturnTracker`; normalized hook lifecycle |
+| `frontend/src/pages/MyDeals.jsx` | Added visual dispute indicator badges; normalized hook lifecycle |
+| `frontend/src/pages/BulkOrder.jsx` | Added hub consolidation opt-in toggle and hub selector; normalized hook lifecycle |
+| `frontend/src/pages/FarmerMatches.jsx` | Normalized hook lifecycle before guest mode check |
+| `frontend/src/pages/Chat.jsx` | Normalized hook lifecycle before guest mode check |
+| `frontend/src/pages/AddProduce.jsx` | Normalized hook lifecycle before guest mode check |
+| `frontend/src/pages/FarmerHub.jsx` | Added missing `Truck` icon import |
 | `frontend/src/pages/admin/AdminDisputes.jsx` | Added dispute resolution actions and reverse logistics trigger |
 | `frontend/src/locales/en.js` | Added localization strings for disputes, returns, and hubs |
 
@@ -204,10 +235,12 @@ The codebase required external MySQL and cloud storage configurations, preventin
 
 - **Automated Backend Tests (`.\mvnw.cmd test`)**:
   - `Mitti2MarketApplicationTests`: **PASSED**
-  - `DisputeAndLogisticsExpansionTest`: **3/3 PASSED**
+  - `DisputeAndLogisticsExpansionTest`: **4/4 PASSED**
   - `TwoWayMatchingAndDealTest`: **3/3 PASSED**
-  - Total: **7 tests run, 0 failures, 0 errors, 0 skipped**.
+  - Total: **8 tests run, 0 failures, 0 errors, 0 skipped**.
+- **Frontend Code Quality & Linter (`npm run lint`)**:
+  - 0 errors across 164 source files.
 - **Frontend Production Build (`npm run build`)**:
-  - Transformed 2642 modules, 0 build errors.
+  - Transformed 2643 modules, 0 build errors.
 - **End-to-End API Verification**:
-  - All 12 runtime integration test cases (catalog, nearest search, auth, multi-leg routing, deals, logistics, returns, dispute resolution, admin controls) passed with 100% success.
+  - All 12 runtime integration test cases passed with 100% success.
