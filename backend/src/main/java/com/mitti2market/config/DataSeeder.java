@@ -89,11 +89,25 @@ public class DataSeeder implements CommandLineRunner {
                         .build()
         );
 
+        getOrCreateUser(
+                "admin@example.com",
+                () -> User.builder()
+                        .name("System Admin (Demo)")
+                        .email("admin@example.com")
+                        .passwordHash(hashedPassword)
+                        .phone("9999999998")
+                        .role(Role.ADMIN)
+                        .location("HQ - New Delhi")
+                        .organizationName("Mitti2Market Admin Operations")
+                        .verified(true)
+                        .verificationStatus(User.VerificationStatus.VERIFIED)
+                        .build()
+        );
+
         // ============================================================
         // 2. FARMERS (4 Realistic Indian Names: 2 Male, 2 Female)
         // ============================================================
 
-        // Male Farmer 1: Ramesh Kumar
         User farmer1 = getOrCreateUser(
                 "ramesh@farmer.com",
                 () -> User.builder()
@@ -101,6 +115,21 @@ public class DataSeeder implements CommandLineRunner {
                         .email("ramesh@farmer.com")
                         .passwordHash(hashedPassword)
                         .phone("9876543210")
+                        .role(Role.FARMER)
+                        .location("Pune, Maharashtra")
+                        .organizationName("Kisan FPO Pune")
+                        .verified(true)
+                        .verificationStatus(User.VerificationStatus.VERIFIED)
+                        .build()
+        );
+
+        getOrCreateUser(
+                "ramesh@example.com",
+                () -> User.builder()
+                        .name("Ramesh Kumar (Demo)")
+                        .email("ramesh@example.com")
+                        .passwordHash(hashedPassword)
+                        .phone("9876543201")
                         .role(Role.FARMER)
                         .location("Pune, Maharashtra")
                         .organizationName("Kisan FPO Pune")
@@ -169,6 +198,22 @@ public class DataSeeder implements CommandLineRunner {
                         .email("procurement@freshmart.com")
                         .passwordHash(hashedPassword)
                         .phone("9876543220")
+                        .role(Role.BUSINESS)
+                        .location("Mumbai, Maharashtra")
+                        .organizationName("FreshMart Agro Procurement Pvt Ltd")
+                        .verified(true)
+                        .verificationStatus(User.VerificationStatus.VERIFIED)
+                        .rating(4.5)
+                        .build()
+        );
+
+        getOrCreateUser(
+                "freshmart@example.com",
+                () -> User.builder()
+                        .name("FreshMart Demo")
+                        .email("freshmart@example.com")
+                        .passwordHash(hashedPassword)
+                        .phone("9876543202")
                         .role(Role.BUSINESS)
                         .location("Mumbai, Maharashtra")
                         .organizationName("FreshMart Agro Procurement Pvt Ltd")
